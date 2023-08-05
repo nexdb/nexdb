@@ -1,0 +1,32 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: install buildx
+        id: buildx
+        uses: crazy-max/ghaction-docker-buildx@v1
+        with:
+          buildx-version: latest
+          qemu-version: latest
+
+      - name: docker login
+        env:
+          DOCKER_USER: ${{secrets.DOCKER_HUB_USER}}
+          DOCKER_PASSWORD: ${{secrets.DOCKER_HUB_TOKEN}}
+        run: |
+          docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+
+      - name: Run Buildx
+        run: |
+          docker buildx build --push \
+            --platform linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x \
+            --output "type=image,push=false" \
+            --file ./Dockerfile --tag nexdb/nexdb:latest .
