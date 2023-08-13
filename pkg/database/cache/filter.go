@@ -56,7 +56,7 @@ func (c *Cache) Filter(collection string, query Query) []*document.Document {
 	c.RLock()
 	defer c.RUnlock()
 	results := []*document.Document{}
-	for _, doc := range c.documents {
+	for _, doc := range c.docs {
 		if doc.Collection != collection {
 			continue
 		}
