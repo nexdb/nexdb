@@ -31,10 +31,7 @@ const (
 type Cache struct {
 	txQueue *Queue
 	sync.RWMutex
-	// documents is a slice of documents in the cache.
-	documents []*document.Document
-	// idx is a map of document ID to documents slice index
-	idx map[string]int
+	docs map[string]*document.Document
 }
 
 // Put puts a document into the cache.
@@ -68,8 +65,7 @@ func (c *Cache) createDocument(d *document.Document) error {
 	c.Lock()
 	defer c.Unlock()
 
-	c.documents = append(c.documents, d)
-	c.idx[d.ID.String()] = len(c.documents) - 1
+	c.docs[d.ID.String()] = d
 
 	return nil
 }
@@ -80,16 +76,12 @@ func (c *Cache) updateDocument(d *document.Document) error {
 	c.Lock()
 	defer c.Unlock()
 
-	// get the document index
-	idx, ok := c.idx[d.ID.String()]
-
-	// if the document doesn't exist, return
-	if !ok {
+	if _, ok := c.docs[d.ID.String()]; !ok {
 		return nil
 	}
 
 	// update the document
-	c.documents[idx] = d
+	c.docs[d.ID.String()] = d
 
 	return nil
 }
@@ -100,12 +92,7 @@ func (c *Cache) GetByID(id string) *document.Document {
 	c.RLock()
 	defer c.RUnlock()
 
-	idx, ok := c.idx[id]
-	if !ok {
-		return nil
-	}
-
-	return c.documents[idx]
+	return c.docs[id]
 }
 
 // Delete deletes a document from the cache. It will lock the cache
@@ -114,14 +101,8 @@ func (c *Cache) Delete(id string) error {
 	c.Lock()
 	defer c.Unlock()
 
-	// grab the document index
-	idx, ok := c.idx[id]
-	if !ok {
-		return nil
-	}
-
 	// get the document
-	d := c.documents[idx]
+	d := c.docs[id]
 
 	// create a copy to pass to the queue
 	dCopy := document.New().SetCollection(d.Collection).SetID(d.ID.String()).SetData(d.Data)
@@ -133,10 +114,7 @@ func (c *Cache) Delete(id string) error {
 	})
 
 	// delete the document from the slice
-	c.documents = append(c.documents[:idx], c.documents[idx+1:]...)
-
-	// update the index
-	delete(c.idx, id)
+	delete(c.docs, id)
 
 	return nil
 }
@@ -144,9 +122,8 @@ func (c *Cache) Delete(id string) error {
 // NewCache returns a new cache.
 func NewCache(ctx context.Context, txQueue *Queue) *Cache {
 	c := &Cache{
-		txQueue:   txQueue,
-		documents: make([]*document.Document, 0),
-		idx:       make(map[string]int),
+		txQueue: txQueue,
+		docs:    make(map[string]*document.Document),
 	}
 
 	go c.txQueue.Start(ctx)
