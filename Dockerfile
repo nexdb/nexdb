@@ -1,5 +1,7 @@
 FROM --platform=$BUILDPLATFORM golang:1.20 AS builder
 
+ARG TARGETARCH
+
 WORKDIR /app
 
 COPY go.mod go.sum ./
